@@ -370,6 +370,7 @@ public class ClientConnector extends ContainerLifeCycle
             setByteBufferPool(new MappedByteBufferPool());
         if (sslContextFactory == null)
             setSslContextFactory(newSslContextFactory());
+        configurator.configure(this);
         selectorManager = newSelectorManager();
         selectorManager.setConnectTimeout(getConnectTimeout().toMillis());
         addBean(selectorManager);
@@ -590,6 +591,15 @@ public class ClientConnector extends ContainerLifeCycle
      */
     public static class Configurator
     {
+        /**
+         * <p>Configures the given {@link ClientConnector} with extra customizations.</p>
+         * @param clientConnector the {@link ClientConnector} to configure
+         * @throws Exception when configuration fails.
+         */
+        protected void configure(ClientConnector clientConnector) throws Exception
+        {
+        }
+
         /**
          * <p>Returns whether the connection to a given {@link SocketAddress} is intrinsically secure.</p>
          * <p>A protocol such as HTTP/1.1 can be transported by TCP; however, TCP is not secure because

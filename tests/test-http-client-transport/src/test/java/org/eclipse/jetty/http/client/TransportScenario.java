@@ -122,7 +122,9 @@ public class TransportScenario
             case FCGI:
                 return new ServerConnector(server, 1, 1, provideServerConnectionFactory(transport));
             case H3:
-                return new HTTP3ServerConnector(server, sslContextFactory, provideServerConnectionFactory(transport));
+                HTTP3ServerConnector http3ServerConnector = new HTTP3ServerConnector(server, sslContextFactory, provideServerConnectionFactory(transport));
+                http3ServerConnector.setCertificateWorkPath(Path.of(System.getProperty("java.io.tmpdir")));
+                return http3ServerConnector;
             case UNIX_DOMAIN:
                 UnixDomainServerConnector connector = new UnixDomainServerConnector(server, provideServerConnectionFactory(transport));
                 connector.setUnixDomainPath(unixDomainPath);
@@ -175,7 +177,6 @@ public class TransportScenario
                 ClientConnector clientConnector = http3Client.getClientConnector();
                 clientConnector.setSelectors(1);
                 clientConnector.setSslContextFactory(sslContextFactory);
-                http3Client.getQuicConfiguration().setVerifyPeerCertificates(false);
                 return new HttpClientTransportOverHTTP3(http3Client);
             }
             case FCGI:
@@ -378,6 +379,12 @@ public class TransportScenario
     {
         SslContextFactory.Client sslContextFactory = new SslContextFactory.Client();
         configureSslContextFactory(sslContextFactory);
+        // H3 must be configured with trustAll to true b/c the certificate in this
+        // store has two Subject Alternative Names: 127.0.0.1 and ::1 so BoringSSL
+        // refuses to look at the certificate's CName so there is no mach with
+        // "localhost", hence it rejects this certificate.
+        if (transport == Transport.H3)
+            sslContextFactory.setTrustAll(true);
         sslContextFactory.setEndpointIdentificationAlgorithm(null);
         return sslContextFactory;
     }

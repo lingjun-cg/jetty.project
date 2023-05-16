@@ -37,8 +37,8 @@ import org.eclipse.jetty.quic.common.QuicConfiguration;
 import org.eclipse.jetty.quic.common.QuicSession;
 import org.eclipse.jetty.quic.common.QuicSessionContainer;
 import org.eclipse.jetty.quic.common.QuicStreamEndPoint;
+import org.eclipse.jetty.quic.quiche.PemExporter;
 import org.eclipse.jetty.quic.quiche.QuicheConfig;
-import org.eclipse.jetty.quic.quiche.SSLKeyPair;
 import org.eclipse.jetty.server.AbstractNetworkConnector;
 import org.eclipse.jetty.server.ConnectionFactory;
 import org.eclipse.jetty.server.Server;
@@ -61,6 +61,7 @@ public class QuicServerConnector extends AbstractNetworkConnector
     private final QuicSessionContainer container = new QuicSessionContainer();
     private final ServerDatagramSelectorManager selectorManager;
     private final SslContextFactory.Server sslContextFactory;
+    private Path certificateWorkPath;
     private Path privateKeyPath;
     private Path certificateChainPath;
     private volatile DatagramChannel datagramChannel;
@@ -90,7 +91,6 @@ public class QuicServerConnector extends AbstractNetworkConnector
         // One bidirectional stream to simulate the TCP stream, and no unidirectional streams.
         quicConfiguration.setMaxBidirectionalRemoteStreams(1);
         quicConfiguration.setMaxUnidirectionalRemoteStreams(0);
-        quicConfiguration.setVerifyPeerCertificates(false);
     }
 
     public QuicConfiguration getQuicConfiguration()
@@ -144,6 +144,16 @@ public class QuicServerConnector extends AbstractNetworkConnector
         this.useOutputDirectByteBuffers = useOutputDirectByteBuffers;
     }
 
+    public Path getCertificateWorkPath()
+    {
+        return certificateWorkPath;
+    }
+
+    public void setCertificateWorkPath(Path certificateWorkPath)
+    {
+        this.certificateWorkPath = certificateWorkPath;
+    }
+
     @Override
     public boolean isOpen()
     {
@@ -169,31 +179,24 @@ public class QuicServerConnector extends AbstractNetworkConnector
         char[] password = keyManagerPassword == null ? sslContextFactory.getKeyStorePassword().toCharArray() : keyManagerPassword.toCharArray();
 
         KeyStore keyStore = sslContextFactory.getKeyStore();
-        SSLKeyPair keyPair = new SSLKeyPair(
-            keyStore,
-            alias,
-            password
-        );
-        Path[] pemFiles = keyPair.export(findTargetPath());
-        privateKeyPath = pemFiles[0];
-        certificateChainPath = pemFiles[1];
+        PemExporter pemExporter = new PemExporter(keyStore);
+        Path[] keyPair = pemExporter.exportKeyPair(alias, password, findCertificateWorkPath());
+        privateKeyPath = keyPair[0];
+        certificateChainPath = keyPair[1];
     }
 
-    private Path findTargetPath() throws IOException
+    private Path findCertificateWorkPath()
     {
-        Path target;
+        if (certificateWorkPath != null)
+            return certificateWorkPath;
         String jettyBase = System.getProperty("jetty.base");
         if (jettyBase != null)
         {
-            target = Path.of(jettyBase).resolve("work");
+            Path workPath = Path.of(jettyBase).resolve("work");
+            if (Files.exists(workPath))
+                return workPath;
         }
-        else
-        {
-            target = sslContextFactory.getKeyStoreResource().getFile().getParentFile().toPath();
-            if (!Files.isDirectory(target))
-                target = Path.of(".");
-        }
-        return target;
+        throw new IllegalStateException("No certificate work path configured");
     }
 
     @Override
@@ -231,7 +234,7 @@ public class QuicServerConnector extends AbstractNetworkConnector
         QuicheConfig quicheConfig = new QuicheConfig();
         quicheConfig.setPrivKeyPemPath(privateKeyPath.toString());
         quicheConfig.setCertChainPemPath(certificateChainPath.toString());
-        quicheConfig.setVerifyPeer(quicConfiguration.isVerifyPeerCertificates());
+        quicheConfig.setVerifyPeer(false);
         // Idle timeouts must not be managed by Quiche.
         quicheConfig.setMaxIdleTimeout(0L);
         quicheConfig.setInitialMaxData((long)quicConfiguration.getSessionRecvWindow());
