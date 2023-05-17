@@ -64,6 +64,7 @@ public class QuicServerConnector extends AbstractNetworkConnector
     private Path certificateWorkPath;
     private Path privateKeyPath;
     private Path certificateChainPath;
+    private Path trustStorePath;
     private volatile DatagramChannel datagramChannel;
     private volatile int localPort = -1;
     private int inputBufferSize = 2048;
@@ -177,12 +178,18 @@ public class QuicServerConnector extends AbstractNetworkConnector
             alias = aliases.stream().findFirst().orElseThrow();
         String keyManagerPassword = sslContextFactory.getKeyManagerPassword();
         char[] password = keyManagerPassword == null ? sslContextFactory.getKeyStorePassword().toCharArray() : keyManagerPassword.toCharArray();
-
         KeyStore keyStore = sslContextFactory.getKeyStore();
         PemExporter pemExporter = new PemExporter(keyStore);
-        Path[] keyPair = pemExporter.exportKeyPair(alias, password, findCertificateWorkPath());
+        Path certificateWorkPath = findCertificateWorkPath();
+        Path[] keyPair = pemExporter.exportKeyPair(alias, password, certificateWorkPath);
         privateKeyPath = keyPair[0];
         certificateChainPath = keyPair[1];
+        KeyStore trustStore = sslContextFactory.getTrustStore();
+        if (trustStore != null)
+        {
+            PemExporter trustPemExporter = new PemExporter(trustStore);
+            trustStorePath = trustPemExporter.exportTrustStore(certificateWorkPath);
+        }
     }
 
     private Path findCertificateWorkPath()
@@ -234,7 +241,8 @@ public class QuicServerConnector extends AbstractNetworkConnector
         QuicheConfig quicheConfig = new QuicheConfig();
         quicheConfig.setPrivKeyPemPath(privateKeyPath.toString());
         quicheConfig.setCertChainPemPath(certificateChainPath.toString());
-        quicheConfig.setVerifyPeer(false);
+        quicheConfig.setTrustedCertsPemPath(trustStorePath == null ? null : trustStorePath.toString());
+        quicheConfig.setVerifyPeer(sslContextFactory.getNeedClientAuth() || sslContextFactory.getWantClientAuth());
         // Idle timeouts must not be managed by Quiche.
         quicheConfig.setMaxIdleTimeout(0L);
         quicheConfig.setInitialMaxData((long)quicConfiguration.getSessionRecvWindow());
@@ -263,6 +271,7 @@ public class QuicServerConnector extends AbstractNetworkConnector
     {
         deleteFile(privateKeyPath);
         deleteFile(certificateChainPath);
+        deleteFile(trustStorePath);
 
         // We want the DatagramChannel to be stopped by the SelectorManager.
         super.doStop();

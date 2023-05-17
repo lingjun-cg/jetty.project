@@ -382,6 +382,7 @@ public class ClientConnector extends ContainerLifeCycle
     {
         super.doStop();
         removeBean(selectorManager);
+        configurator.unconfigure();
     }
 
     protected SslContextFactory.Client newSslContextFactory()
@@ -592,11 +593,19 @@ public class ClientConnector extends ContainerLifeCycle
     public static class Configurator
     {
         /**
-         * <p>Configures the given {@link ClientConnector} with extra customizations.</p>
+         * <p>Applies extra configuration taken from the {@link ClientConnector}.</p>
          * @param clientConnector the {@link ClientConnector} to configure
          * @throws Exception when configuration fails.
          */
         protected void configure(ClientConnector clientConnector) throws Exception
+        {
+        }
+
+        /**
+         * <p>Unapplies the extra configuration done in {@link #configure(ClientConnector)}.</p>
+         * @throws Exception when unconfiguration fails.
+         */
+        protected void unconfigure() throws Exception
         {
         }
 
