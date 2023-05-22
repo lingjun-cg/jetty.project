@@ -125,9 +125,11 @@ public abstract class HTTP3StreamConnection extends AbstractConnection
                 case FRAME ->
                 {
                     action.getAndSet(null).run();
-                    // Release the network buffer here (if empty), since the application may
-                    // not be reading more bytes, to avoid to keep around a consumed buffer.
-                    tryReleaseBuffer(false);
+                    // We cannot release the buffer eagerly here as that would race
+                    // with another thread executing user code calling Stream.read();
+                    // that user thread could throw NPE in HTTP3StreamConnection.parseAndFill()
+                    // when trying to access the networkBuffer field that is set
+                    // to null here depending on which thread wins the race - see #9765.
                 }
             }
         }
