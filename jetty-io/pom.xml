@@ -18,6 +18,10 @@
       <version>${project.version}</version>
     </dependency>
     <dependency>
+      <groupId>org.crac</groupId>
+      <artifactId>crac</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.eclipse.jetty.toolchain</groupId>
       <artifactId>jetty-test-helper</artifactId>
       <scope>test</scope>

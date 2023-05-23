@@ -51,13 +51,17 @@ import org.eclipse.jetty.util.thread.ExecutionStrategy;
 import org.eclipse.jetty.util.thread.Scheduler;
 import org.eclipse.jetty.util.thread.strategy.EatWhatYouKill;
 
+import org.crac.Context;
+import org.crac.Core;
+import org.crac.Resource;
+
 /**
  * <p>{@link ManagedSelector} wraps a {@link Selector} simplifying non-blocking operations on channels.</p>
  * <p>{@link ManagedSelector} runs the select loop, which waits on {@link Selector#select()} until events
  * happen for registered channels. When events happen, it notifies the {@link EndPoint} associated
  * with the channel.</p>
  */
-public class ManagedSelector extends ContainerLifeCycle implements Dumpable
+public class ManagedSelector extends ContainerLifeCycle implements Dumpable,Resource
 {
     private static final Logger LOG = Log.getLogger(ManagedSelector.class);
 
@@ -104,6 +108,16 @@ public class ManagedSelector extends ContainerLifeCycle implements Dumpable
         Start start = new Start();
         submit(start);
         start._started.await();
+    }
+
+    @Override
+    public void beforeCheckpoint(Context<? extends Resource> context) throws Exception {
+        doStop();
+    }
+
+    @Override
+    public void afterRestore(Context<? extends Resource> context) throws Exception {
+        doStart();
     }
 
     public int size()
