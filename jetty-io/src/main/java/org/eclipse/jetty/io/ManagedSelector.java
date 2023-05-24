@@ -83,6 +83,7 @@ public class ManagedSelector extends ContainerLifeCycle implements Dumpable,Reso
         _strategy = new EatWhatYouKill(producer,executor);
         addBean(_strategy,true);
         setStopTimeout(5000);
+        Core.getGlobalContext().register(this);
     }
 
     public Selector getSelector()
